@@ -1,11 +1,11 @@
 package d76.app.security.config;
 
-import d76.app.oauth.CustomOidcUserService;
-import d76.app.security.exception.handler.RestAccessDeniedHandler;
-import d76.app.security.exception.handler.RestAuthenticationEntryPoint;
-import d76.app.security.handler.CustomAuthenticationFailureHandler;
-import d76.app.security.handler.CustomAuthenticationSuccessHandler;
-import d76.app.security.handler.CustomLogoutSuccessHandler;
+import d76.app.security.oauth.CustomOidcUserService;
+import d76.app.security.access.RestAccessDeniedHandler;
+import d76.app.security.access.RestAuthenticationEntryPoint;
+import d76.app.security.auth.LoginFailureHandler;
+import d76.app.security.auth.LoginSuccessHandler;
+import d76.app.security.auth.LogoutSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.context.annotation.Bean;
@@ -29,13 +29,13 @@ public class SecurityConfig {
 
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
-    private final CustomLogoutSuccessHandler logoutSuccessHandler;
-    private final CustomAuthenticationSuccessHandler authenticationSuccessHandler;
-    private final CustomAuthenticationFailureHandler authenticationFailureHandler;
+    private final LogoutSuccessHandler logoutSuccessHandler;
+    private final LoginSuccessHandler authenticationSuccessHandler;
+    private final LoginFailureHandler authenticationFailureHandler;
     private final CustomOidcUserService oAuth2UserService;
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity security) {
+    SecurityFilterChain filterChain(HttpSecurity security) throws Exception {
         security
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
@@ -44,7 +44,9 @@ public class SecurityConfig {
                 )
                 .formLogin(f -> f
                         .loginProcessingUrl("/api/auth/login")
+                        .loginPage("/api/auth/login")
                         .successHandler(authenticationSuccessHandler)
+                        .failureHandler(authenticationFailureHandler)
                 )
                 .logout(l -> l
                         .logoutUrl("/api/auth/logout")
@@ -81,7 +83,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) {
+    AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
         return configuration.getAuthenticationManager();
     }
 }

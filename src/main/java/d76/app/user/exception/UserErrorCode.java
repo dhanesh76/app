@@ -1,6 +1,6 @@
 package d76.app.user.exception;
 
-import d76.app.exception.ErrorCode;
+import d76.app.core.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 public enum UserErrorCode implements ErrorCode {

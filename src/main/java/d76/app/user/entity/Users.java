@@ -1,6 +1,6 @@
 package d76.app.user.entity;
 
-import d76.app.security.model.AuthProviders;
+import d76.app.auth.model.AuthProviders;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
