@@ -4,11 +4,12 @@ import d76.app.core.exception.BusinessException;
 import d76.app.auth.dto.RegisterRequest;
 import d76.app.auth.dto.RegisterResponse;
 import d76.app.auth.exception.AuthErrorCode;
-import d76.app.auth.model.AuthProviders;
+import d76.app.auth.model.AuthProvider;
 import d76.app.user.entity.Role;
 import d76.app.user.entity.Users;
 import d76.app.user.repo.RoleRepository;
 import d76.app.user.repo.UsersRepository;
+import d76.app.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,43 +22,15 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private  final UsersRepository usersRepository;
     private final PasswordEncoder passwordEncoder;
-    private final RoleRepository roleRepository;
+    private final UserService userService;
 
-    private static final String DEFAULT_ROLE = "USER";
-
-    @Transactional
     public RegisterResponse register(RegisterRequest request) {
 
-        if(usersRepository.existsByEmail(request.email())){
-            throw new BusinessException(AuthErrorCode.EMAIL_ALREADY_REGISTERED);
-        }
+        String encodedPassword = passwordEncoder.encode(request.password());
 
-        if(usersRepository.existsByUsername(request.userName())){
-            throw new BusinessException(AuthErrorCode.USERNAME_TAKEN);
-        }
+        var user = userService.createLocalUser(request.email(), request.userName(), encodedPassword);
 
-
-        Role role = roleRepository.findByName(DEFAULT_ROLE).orElseThrow(
-                () -> new BusinessException(AuthErrorCode.ROLE_NOT_FOUND, "No role exists with name: " + DEFAULT_ROLE)
-        );
-
-        Set<Role> roles = new HashSet<>();
-        roles.add(role);
-
-        Set<AuthProviders> authProviders = new HashSet<>();
-        authProviders.add(AuthProviders.EMAIL);
-
-        Users user = Users.builder()
-                .username(request.userName())
-                .email(request.email())
-                .password(passwordEncoder.encode(request.password()))
-                .authProviders(authProviders)
-                .roles(roles)
-                .build();
-
-        usersRepository.save(user);
-        return new RegisterResponse(user.getEmail(), user.getCreatedAt());
+        return new RegisterResponse(user.getEmail(), user.getCreatedAt(), AuthProvider.EMAIL.name());
     }
 }

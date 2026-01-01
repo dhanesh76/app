@@ -1,6 +1,8 @@
 package d76.app.security.jwt;
 
+import d76.app.security.jwt.model.JwtPurpose;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import javax.xml.crypto.Data;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
@@ -26,7 +30,7 @@ public class JwtService {
         this.tokenTTL = tokenTTL;
     }
 
-    SecretKey getKey(){
+    private SecretKey getKey(){
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
@@ -51,7 +55,38 @@ public class JwtService {
                 .compact();
     }
 
-    Claims extractClaims(String token){
+    boolean validateAccessToken(UserDetails principal, String token){
+            boolean isUsernameMatches = extractUsername(token).equals(principal.getUsername());
+            boolean notExpired = (new Date()).before(extractExpiration(token));
+
+        return isUsernameMatches && notExpired;
+    }
+
+    public String generateActionToken(String email, JwtPurpose purpose, String provider){
+
+        String jti = UUID.randomUUID().toString();
+        return Jwts
+                .builder()
+                .id(jti)
+                .subject(email)
+                .claim("purpose", purpose.name())
+                .claim("provider", provider)
+                .issuedAt(new Date())
+                .expiration(Date.from(Instant.now().plusSeconds(300))) //valid for 5 mins
+                .signWith(getKey(), Jwts.SIG.HS256)
+                .compact();
+    }
+
+    public boolean validateActionToken(String token, JwtPurpose purpose){
+        var claims = extractClaims(token);
+
+        var purposeMatches = purpose.name().equals(claims.get("purpose", String.class));
+        var notExpired = new Date().before(extractExpiration(token));
+
+        return purposeMatches && notExpired;
+    }
+
+    public Claims extractClaims(String token){
         return Jwts
                 .parser()
                 .verifyWith(getKey())
@@ -66,11 +101,5 @@ public class JwtService {
 
     Date extractExpiration(String token){
         return extractClaims(token).getExpiration();
-    }
-
-    boolean validateToken(UserDetails principal, String token){
-            boolean isUsernameMatches = extractUsername(token).equals(principal.getUsername());
-            boolean isTokenValid = (new Date()).before(extractExpiration(token));
-            return isUsernameMatches && isTokenValid;
     }
 }

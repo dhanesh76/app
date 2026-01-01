@@ -1,7 +1,11 @@
 package d76.app.security.auth;
 
-import d76.app.core.exception.ApiErrorResponse;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import d76.app.auth.exception.AuthErrorCode;
+import d76.app.core.exception.ApiErrorResponse;
+import d76.app.security.jwt.JwtService;
+import d76.app.security.jwt.model.JwtPurpose;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -11,10 +15,10 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Map;
 
 @NullMarked
 @Component
@@ -22,6 +26,7 @@ import java.time.Instant;
 public class LoginFailureHandler implements AuthenticationFailureHandler {
 
     private final ObjectMapper objectMapper;
+    private final JwtService jwtService;
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse res, AuthenticationException ex) throws IOException {
@@ -29,31 +34,17 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
         if (ex instanceof OAuth2AuthenticationException oae) {
             var oaeError = oae.getError();
 
-            String provider =  "";
-            String desc = oaeError.getDescription();
-            if(desc != null && oaeError.getDescription().startsWith("provider:"))
-                provider = desc.substring("provider:".length());
+            String desc = oae.getError().getDescription();
+
+            Map<String, String> meta = Map.of();
+            if (desc != null)
+                meta = objectMapper.readValue(desc, new TypeReference<>() {
+                });
+
+            String provider = meta.get("provider");
+            String email = meta.get("email");
 
             switch (oaeError.getErrorCode()) {
-                case "user_not_registered" -> {
-
-                    var statuscode = HttpStatus.CONFLICT.value();
-
-                    res.setStatus(statuscode);
-                    res.setContentType("application/json");
-
-                    ApiErrorResponse response = ApiErrorResponse
-                            .builder()
-                            .errorCode(AuthErrorCode.USER_NOT_REGISTERED.name())
-                            .statusCode(statuscode)
-                            .message(ex.getMessage())
-                            .timestamp(Instant.now())
-                            .path(request.getRequestURI())
-                            .authProvider(provider.toUpperCase())
-                            .build();
-                    res.getWriter().write(objectMapper.writeValueAsString(response));
-                    return;
-                }
                 case "email_missing" -> {
                     var statuscode = HttpStatus.BAD_REQUEST.value();
 
@@ -67,13 +58,37 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
                             .message(ex.getMessage())
                             .timestamp(Instant.now())
                             .path(request.getRequestURI())
-                            .authProvider(provider.toUpperCase())
+                            .authProvider(provider)
                             .build();
 
                     res.getWriter().write(objectMapper.writeValueAsString(response));
                     return;
                 }
+
+                case "user_not_registered" -> {
+
+                    var actionToken = jwtService.generateActionToken(email, JwtPurpose.SOCIAL_REGISTER, provider);
+                    var statuscode = HttpStatus.CONFLICT.value();
+
+                    res.setStatus(statuscode);
+                    res.setContentType("application/json");
+
+                    ApiErrorResponse response = ApiErrorResponse
+                            .builder()
+                            .errorCode(AuthErrorCode.USER_NOT_REGISTERED.name())
+                            .statusCode(statuscode)
+                            .message(ex.getMessage())
+                            .timestamp(Instant.now())
+                            .path(request.getRequestURI())
+                            .authProvider(provider)
+                            .actionToken(actionToken)
+                            .build();
+                    res.getWriter().write(objectMapper.writeValueAsString(response));
+                    return;
+                }
+
                 case "auth_provider_not_linked" -> {
+                    var actionToken = jwtService.generateActionToken(email, JwtPurpose.LINK_SOCIAL_ACCOUNT, provider);
                     var statuscode = HttpStatus.CONFLICT.value();
 
                     res.setStatus(statuscode);
@@ -83,10 +98,11 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
                             .builder()
                             .errorCode(AuthErrorCode.AUTH_PROVIDER_NOT_LINKED.name())
                             .statusCode(statuscode)
-                            .message(ex.getMessage())
+                            .message(meta.get("message"))
                             .timestamp(Instant.now())
                             .path(request.getRequestURI())
                             .authProvider(provider)
+                            .actionToken(actionToken)
                             .build();
 
                     res.getWriter().write(objectMapper.writeValueAsString(response));
@@ -102,6 +118,7 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
                 .message(errorCode.defaultMessage())
                 .path(request.getRequestURI())
                 .timestamp(Instant.now())
+                .authProvider("EMAIL")
                 .build();
 
         res.setStatus(errorCode.getStatus().value());

@@ -11,14 +11,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@RestControllerAdvice
 @NullMarked
+@RestControllerAdvice(annotations = RestController.class)
 public final class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
@@ -39,7 +40,7 @@ public final class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    ResponseEntity<@NonNull ApiErrorResponse> handleMethodArgumentNotValidException(
+    ResponseEntity<ApiErrorResponse> handleMethodArgumentNotValidException(
             MethodArgumentNotValidException ex, HttpServletRequest request
     ){
         List<ApiErrorResponse.ApiFieldError> fieldErrors =  ex

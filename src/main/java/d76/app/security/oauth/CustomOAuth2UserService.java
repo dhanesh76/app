@@ -1,6 +1,8 @@
 package d76.app.security.oauth;
 
-import d76.app.auth.model.AuthProviders;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import d76.app.auth.model.AuthProvider;
 import d76.app.user.entity.Users;
 import d76.app.user.repo.UsersRepository;
 import lombok.NonNull;
@@ -28,9 +30,11 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
 
     private final WebClient webClient;
     private final UsersRepository usersRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
+
         var delegate = new DefaultOAuth2UserService();
         var oAuth2User = delegate.loadUser(userRequest);
 
@@ -42,7 +46,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             throw new OAuth2AuthenticationException(
                     new OAuth2Error(
                             "email_missing",
-                            "provider:" + provider,
+                            constructPayload(provider, null),
                             null
                     ),
                     provider + " account has no accessible email"
@@ -53,19 +57,19 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
              new OAuth2AuthenticationException(
                      new OAuth2Error(
                              "user_not_registered",
-                             "provider:" + provider,
+                             constructPayload(provider, email),
                              null
                      ),
                     "No user exists with email: " + email
             )
         );
 
-        if (!user.getAuthProviders().contains(AuthProviders.GITHUB)) {
+        if (!user.getAuthProviders().contains(AuthProvider.GITHUB)) {
             throw new OAuth2AuthenticationException(
-                    new OAuth2Error("auth_provider_not_linked"),
+                    new OAuth2Error("auth_provider_not_linked",
+                            constructPayload(provider, email), null),
                     "The email address " + email +
-                            " is not associated with Github sign-in. Please sign in using a linked authentication method and link Github from your account settings to enable Github login."
-            );
+                            " is not associated with Github sign-in. Do you want to link?");
         }
 
         var authorities = user.getRoles().stream()
@@ -76,6 +80,19 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         attributes.put("email", email);
 
         return new DefaultOAuth2User(authorities, attributes, "email");
+    }
+
+    private String constructPayload(String provider, String email) {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("provider", provider);
+        if (email != null)
+            meta.put("email", email);
+
+        try {
+            return objectMapper.writeValueAsString(meta);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Nullable

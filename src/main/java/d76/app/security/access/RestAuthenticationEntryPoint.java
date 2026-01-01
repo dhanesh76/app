@@ -1,5 +1,6 @@
 package d76.app.security.access;
 
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import d76.app.core.exception.ApiErrorResponse;
 import d76.app.auth.exception.AuthErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,12 +24,13 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
     private final ObjectMapper objectMapper;
 
     /**
-     * Triggered when accessing a protected resource without being logged in
+     * Triggered when accessing a protected resource without being logged-in
      * User is anonymous / session expired / no token
      */
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, @NonNull AuthenticationException authenticationException) throws IOException {
 
+        objectMapper.registerModule(new JavaTimeModule());
         AuthErrorCode errorCode = AuthErrorCode.INVALID_CREDENTIALS;
         ApiErrorResponse errorResponse = ApiErrorResponse
                 .builder()

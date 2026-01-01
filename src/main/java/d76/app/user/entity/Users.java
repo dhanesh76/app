@@ -1,6 +1,6 @@
 package d76.app.user.entity;
 
-import d76.app.auth.model.AuthProviders;
+import d76.app.auth.model.AuthProvider;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -52,7 +52,7 @@ public class Users {
             joinColumns = @JoinColumn(name = "user_id")
     )
     @Column(name = "auth_provider")
-    private Set<AuthProviders> authProviders;
+    private Set<AuthProvider> authProviders;
 
     @CreationTimestamp
     private Instant createdAt;

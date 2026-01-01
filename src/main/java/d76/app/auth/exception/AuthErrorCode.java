@@ -1,6 +1,7 @@
 package d76.app.auth.exception;
 
 import d76.app.core.exception.ErrorCode;
+import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatus;
 
 public enum AuthErrorCode implements ErrorCode {
@@ -18,10 +19,16 @@ public enum AuthErrorCode implements ErrorCode {
     USER_NOT_REGISTERED(HttpStatus.CONFLICT, "No account is associated with this email address."),
     EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "A valid email address is required."),
 
+    //oauth-registration
+    INVALID_AUTH_PROVIDER(HttpStatus.BAD_REQUEST, "Invalid Authentication Provider"),
+
     // provider linking
     AUTH_PROVIDER_NOT_LINKED(HttpStatus.CONFLICT,
             "This email address is not linked to the selected authentication provider. " +
-                    "Please sign in using a linked method or link this provider in your account settings.");
+                    "Please sign in using a linked method or link this provider in your account settings."),
+
+    //jwt
+    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "Invalid Token");
 
     private final HttpStatus status;
     private final String defaultMessage;

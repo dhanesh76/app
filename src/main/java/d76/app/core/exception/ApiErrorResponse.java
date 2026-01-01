@@ -19,6 +19,7 @@ public class ApiErrorResponse {
     private List<ApiFieldError> errors;
 
     private String authProvider;
+    private String actionToken;
 
     @Data
     @AllArgsConstructor

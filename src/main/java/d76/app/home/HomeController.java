@@ -1,6 +1,7 @@
 package d76.app.home;
 
 import io.jsonwebtoken.Jwts;
+import org.hibernate.mapping.Property;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,8 +16,8 @@ import java.util.Properties;
 public class HomeController {
 
     @GetMapping("/")
-    Properties home(){
-        return  System.getProperties();
+    String home(){
+        return  System.getProperty("os.name");
     }
 
     @GetMapping("/user/secured")
