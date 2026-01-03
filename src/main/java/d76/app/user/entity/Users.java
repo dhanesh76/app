@@ -12,8 +12,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@AllArgsConstructor @NoArgsConstructor
-@Getter @Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@Setter
 @Builder
 public class Users {
 
@@ -52,6 +54,7 @@ public class Users {
             joinColumns = @JoinColumn(name = "user_id")
     )
     @Column(name = "auth_provider")
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Set<AuthProvider> authProviders;
 
     @CreationTimestamp

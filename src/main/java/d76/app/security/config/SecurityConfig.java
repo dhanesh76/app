@@ -1,19 +1,17 @@
 package d76.app.security.config;
 
-import d76.app.security.jwt.JwtFilter;
-import d76.app.security.oauth.CustomOidcUserService;
 import d76.app.security.access.RestAccessDeniedHandler;
 import d76.app.security.access.RestAuthenticationEntryPoint;
 import d76.app.security.auth.LoginFailureHandler;
 import d76.app.security.auth.LoginSuccessHandler;
 import d76.app.security.auth.LogoutSuccessHandler;
+import d76.app.security.jwt.JwtFilter;
+import d76.app.security.oauth.CustomOidcUserService;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -38,7 +36,7 @@ public class SecurityConfig {
     private final JwtFilter jwtFilter;
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity security) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity security) {
         security
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
@@ -65,12 +63,15 @@ public class SecurityConfig {
                 .authorizeHttpRequests(req -> req
                         .requestMatchers("/", "/home").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/oauth/**").permitAll()
+                        .requestMatchers("/api/users/**").permitAll()
                         .requestMatchers(
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/login/**",
                                 "/error"
                         ).permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
@@ -84,10 +85,5 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
-        return configuration.getAuthenticationManager();
     }
 }

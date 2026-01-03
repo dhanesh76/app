@@ -42,7 +42,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
 
         String email = fetchPrimaryEmail(userRequest, oAuth2User);
 
-        if(email == null){
+        if (email == null) {
             throw new OAuth2AuthenticationException(
                     new OAuth2Error(
                             "email_missing",
@@ -53,15 +53,15 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             );
         }
 
-        Users user =  usersRepository.findByEmail(email).orElseThrow( () ->
-             new OAuth2AuthenticationException(
-                     new OAuth2Error(
-                             "user_not_registered",
-                             constructPayload(provider, email),
-                             null
-                     ),
-                    "No user exists with email: " + email
-            )
+        Users user = usersRepository.findByEmail(email).orElseThrow(() ->
+                new OAuth2AuthenticationException(
+                        new OAuth2Error(
+                                "user_not_registered",
+                                constructPayload(provider, email),
+                                null
+                        ),
+                        "No user exists with email: " + email
+                )
         );
 
         if (!user.getAuthProviders().contains(AuthProvider.GITHUB)) {
@@ -84,7 +84,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
 
     private String constructPayload(String provider, String email) {
         Map<String, Object> meta = new HashMap<>();
-        meta.put("provider", provider);
+        meta.put("authProvider", provider);
         if (email != null)
             meta.put("email", email);
 
@@ -99,7 +99,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
     private String fetchPrimaryEmail(OAuth2UserRequest request, OAuth2User oAuth2User) {
 
         String email = oAuth2User.getAttribute("email");
-        if(email != null) return email;
+        if (email != null) return email;
 
         String token = request.getAccessToken().getTokenValue();
 
@@ -108,7 +108,8 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 .uri("https://api.github.com/user/emails")
                 .headers(h -> h.setBearerAuth(token))
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<@NonNull List<Map<String, Object>>>(){})
+                .bodyToMono(new ParameterizedTypeReference<@NonNull List<Map<String, Object>>>() {
+                })
                 .block();
 
         return emails == null ? null : emails.stream()

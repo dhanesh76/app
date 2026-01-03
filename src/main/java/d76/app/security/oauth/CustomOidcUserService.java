@@ -31,7 +31,7 @@ public class CustomOidcUserService extends OidcUserService {
         String provider = userRequest.getClientRegistration().getRegistrationId();
 
         String email = oidcUser.getAttribute("email");
-        if(email == null){
+        if (email == null) {
             throw new OAuth2AuthenticationException(
                     new OAuth2Error(
                             "email_missing",
@@ -74,7 +74,7 @@ public class CustomOidcUserService extends OidcUserService {
 
     private String constructPayload(String provider, String email) {
         Map<String, Object> meta = new HashMap<>();
-        meta.put("provider", provider);
+        meta.put("authProvider", provider);
         if (email != null)
             meta.put("email", email);
 

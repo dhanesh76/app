@@ -1,105 +1,190 @@
 package d76.app.security.jwt;
 
+import d76.app.auth.exception.AuthErrorCode;
+import d76.app.core.exception.BusinessException;
 import d76.app.security.jwt.model.JwtPurpose;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
-import javax.xml.crypto.Data;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class JwtService {
 
     private final String secret;
-    private final Long tokenTTL;
+    private final long accessTokenTTLSeconds;
+    private final long actionTokenTTLSeconds;
+    private final long reAuthTokenTTLSeconds;
 
-    JwtService(@Value("${jwt.secret}") String secret,
-               @Value("${jwt.tokenTTL}") Long tokenTTL
+    JwtService(
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.access.tokenTTL}") long accessTokenTTLSeconds,
+            @Value("${jwt.action.tokenTTL}") long actionTokenTTLSeconds,
+            @Value("${jwt.reAuth.tokenTTL}") long reAuthTokenTTLSeconds
     ) {
         this.secret = secret;
-        this.tokenTTL = tokenTTL;
+        this.accessTokenTTLSeconds = accessTokenTTLSeconds;
+        this.actionTokenTTLSeconds = actionTokenTTLSeconds;
+        this.reAuthTokenTTLSeconds = reAuthTokenTTLSeconds;
     }
 
-    private SecretKey getKey(){
+    private SecretKey getKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    public String generateAccessToken(UserDetails principal){
+    /**
+     * ACCESS TOKEN
+     */
+    public String generateAccessToken(UserDetails principal) {
 
-        var  jit = UUID.randomUUID().toString();
-        var role = principal
-                .getAuthorities()
+        String jti = UUID.randomUUID().toString();
+
+        String role = principal.getAuthorities()
                 .stream()
                 .findFirst()
                 .map(GrantedAuthority::getAuthority)
                 .orElse("");
 
-        return  Jwts
-                .builder()
-                .id(jit)
+        return Jwts.builder()
+                .id(jti)
                 .subject(principal.getUsername())
-                .signWith(getKey(), Jwts.SIG.HS256)
                 .issuedAt(new Date())
-                .expiration(Date.from(Instant.now().plusSeconds(tokenTTL)))
+                .expiration(Date.from(Instant.now().plusSeconds(accessTokenTTLSeconds)))
                 .claim("role", role)
+                .signWith(getKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
-    boolean validateAccessToken(UserDetails principal, String token){
-            boolean isUsernameMatches = extractUsername(token).equals(principal.getUsername());
-            boolean notExpired = (new Date()).before(extractExpiration(token));
+    public void assertAccessTokenValid(UserDetails principal, String token) {
 
-        return isUsernameMatches && notExpired;
+        Claims claims = extractClaims(token);
+
+        boolean subjectMatches = claims.getSubject().equals(principal.getUsername());
+        boolean notExpired = new Date().before(claims.getExpiration());
+
+        if (!subjectMatches || !notExpired) {
+
+            String reason = !subjectMatches ? "subject_mismatch" : "expired";
+
+            log.warn("Access token rejected for user={} reason={}",
+                    principal.getUsername(),
+                    reason
+            );
+
+            throw new BusinessException(AuthErrorCode.INVALID_TOKEN);
+        }
     }
 
-    public String generateActionToken(String email, JwtPurpose purpose, String provider){
+    /**
+     * ACTION TOKEN
+     */
+
+    public String generateActionToken(String email, JwtPurpose purpose, String authProvider) {
 
         String jti = UUID.randomUUID().toString();
-        return Jwts
-                .builder()
+
+        return Jwts.builder()
                 .id(jti)
                 .subject(email)
                 .claim("purpose", purpose.name())
-                .claim("provider", provider)
+                .claim("authProvider", authProvider)
                 .issuedAt(new Date())
-                .expiration(Date.from(Instant.now().plusSeconds(300))) //valid for 5 mins
+                .expiration(Date.from(Instant.now().plusSeconds(actionTokenTTLSeconds))) // 5 mins
                 .signWith(getKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
-    public boolean validateActionToken(String token, JwtPurpose purpose){
-        var claims = extractClaims(token);
+    public void assertActionTokenValid(String token, JwtPurpose expectedPurpose) {
 
-        var purposeMatches = purpose.name().equals(claims.get("purpose", String.class));
-        var notExpired = new Date().before(extractExpiration(token));
+        Claims claims = extractClaims(token);
 
-        return purposeMatches && notExpired;
+        boolean purposeMatches = expectedPurpose.name().equals(claims.get("purpose", String.class));
+        boolean notExpired = new Date().before(claims.getExpiration());
+
+        if (!purposeMatches || !notExpired) {
+
+            String reason = !purposeMatches ? "purpose_mismatch" : "expired";
+            log.warn("Action token rejected for user={} reason={} expectedPurpose={}",
+                    claims.getSubject(),
+                    reason,
+                    expectedPurpose
+            );
+            throw new BusinessException(AuthErrorCode.INVALID_TOKEN);
+        }
     }
 
-    public Claims extractClaims(String token){
+    /**
+     * RE_AUTH TOKEN
+     */
+    public String generateReAuthToken(String email, JwtPurpose jwtPurpose) {
         return Jwts
-                .parser()
-                .verifyWith(getKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .builder()
+                .id(UUID.randomUUID().toString())
+                .subject(email)
+                .claim("purpose", JwtPurpose.REAUTH.name())
+                .issuedAt(new Date())
+                .expiration(Date.from(Instant.now().plusSeconds(reAuthTokenTTLSeconds))) // 3 mins
+                .signWith(getKey(), Jwts.SIG.HS256)
+                .compact();
     }
 
-    String extractUsername(String token){
+    public void assertReAuthTokenValid(String email, String token, JwtPurpose expectedPurpose) {
+
+        Claims claims = extractClaims(token);
+
+        boolean subjectMatches = email.equals(claims.getSubject());
+        boolean purposeMatches = expectedPurpose.name().equals(claims.get("purpose", String.class));
+        boolean notExpired = new Date().before(claims.getExpiration());
+
+        if (!purposeMatches || !notExpired || !subjectMatches) {
+
+            String reason = !purposeMatches ? "purpose_mismatch" :
+                    !subjectMatches ? "subject_mismatch" : "purpose_mismatch";
+
+            log.warn("ReAuth token rejected for user={} reason={} expected_user={} expectedPurpose={}",
+                    claims.getSubject(),
+                    reason,
+                    email,
+                    expectedPurpose
+            );
+            throw new BusinessException(AuthErrorCode.INVALID_TOKEN);
+        }
+    }
+
+    /**
+     * CORE
+     */
+    public Claims extractClaims(String token) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(getKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+        } catch (JwtException ex) {
+
+            log.warn("JWT parsing/verification failed: {}", ex.getMessage(), ex);
+
+            throw new BusinessException(
+                    AuthErrorCode.INVALID_TOKEN,
+                    "Invalid or tampered token"
+            );
+        }
+    }
+
+    public String extractUserName(String token) {
         return extractClaims(token).getSubject();
-    }
-
-    Date extractExpiration(String token){
-        return extractClaims(token).getExpiration();
     }
 }

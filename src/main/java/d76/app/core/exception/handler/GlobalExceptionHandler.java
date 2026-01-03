@@ -4,8 +4,6 @@ import d76.app.core.exception.ApiErrorResponse;
 import d76.app.core.exception.BusinessException;
 import d76.app.core.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.NonNull;
-
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,8 +21,8 @@ import java.util.stream.Collectors;
 public final class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
-    ResponseEntity<@NonNull ApiErrorResponse> handleBusinessException(BusinessException ex,
-                                                                      HttpServletRequest request){
+    ResponseEntity<ApiErrorResponse> handleBusinessException(BusinessException ex,
+                                                             HttpServletRequest request) {
 
         ErrorCode errorCode = ex.getErrorCode();
 
@@ -42,14 +40,14 @@ public final class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiErrorResponse> handleMethodArgumentNotValidException(
             MethodArgumentNotValidException ex, HttpServletRequest request
-    ){
-        List<ApiErrorResponse.ApiFieldError> fieldErrors =  ex
+    ) {
+        List<ApiErrorResponse.ApiFieldError> fieldErrors = ex
                 .getBindingResult().getFieldErrors()
                 .stream().map(fieldError ->
-                            new ApiErrorResponse.ApiFieldError(
-                                    fieldError.getField(),
-                                    fieldError.getDefaultMessage()
-                            )
+                        new ApiErrorResponse.ApiFieldError(
+                                fieldError.getField(),
+                                fieldError.getDefaultMessage()
+                        )
                 )
                 .collect(Collectors.toList());
 
@@ -67,7 +65,7 @@ public final class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    ResponseEntity<@NonNull ApiErrorResponse> handleException(Exception ex, HttpServletRequest request){
+    ResponseEntity<ApiErrorResponse> handleException(Exception ex, HttpServletRequest request) {
 
         ApiErrorResponse response = ApiErrorResponse
                 .builder()
@@ -77,6 +75,6 @@ public final class GlobalExceptionHandler {
                 .message("Unexpected error occurred")
                 .path(request.getRequestURI())
                 .build();
-        return  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR.value()).body(response);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR.value()).body(response);
     }
 }

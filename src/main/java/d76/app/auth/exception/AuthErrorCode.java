@@ -1,7 +1,6 @@
 package d76.app.auth.exception;
 
 import d76.app.core.exception.ErrorCode;
-import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatus;
 
 public enum AuthErrorCode implements ErrorCode {
@@ -16,7 +15,6 @@ public enum AuthErrorCode implements ErrorCode {
     EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, "An account already exists with this email address."),
 
     // oauth
-    USER_NOT_REGISTERED(HttpStatus.CONFLICT, "No account is associated with this email address."),
     EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "A valid email address is required."),
 
     //oauth-registration
@@ -29,6 +27,7 @@ public enum AuthErrorCode implements ErrorCode {
 
     //jwt
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "Invalid Token");
+
 
     private final HttpStatus status;
     private final String defaultMessage;

@@ -3,14 +3,21 @@ package d76.app.user.service;
 import d76.app.auth.exception.AuthErrorCode;
 import d76.app.auth.model.AuthProvider;
 import d76.app.core.exception.BusinessException;
+import d76.app.security.jwt.JwtService;
+import d76.app.security.jwt.model.JwtPurpose;
+import d76.app.user.dto.password.ChangePasswordRequest;
+import d76.app.user.dto.password.VerifyPasswordResponse;
 import d76.app.user.entity.Role;
 import d76.app.user.entity.Users;
+import d76.app.user.exception.UserErrorCode;
 import d76.app.user.repo.RoleRepository;
 import d76.app.user.repo.UsersRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -20,11 +27,13 @@ public class UserService {
 
     private final UsersRepository usersRepository;
     private final RoleRepository roleRepository;
+    private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
 
     private final String DEFAULT_ROLE = "USER";
 
     @Transactional
-    public Users createLocalUser(String email, String username, String encodedPassword){
+    public Users createLocalUser(String email, String username, String password) {
 
         //ensure the availability
         assertEmailAvailable(email);
@@ -38,7 +47,7 @@ public class UserService {
         Users user = Users.builder()
                 .username(username)
                 .email(email)
-                .password(encodedPassword)
+                .password(passwordEncoder.encode(password))
                 .authProviders(authProviders)
                 .roles(roles)
                 .build();
@@ -47,7 +56,7 @@ public class UserService {
     }
 
     @Transactional
-    public Users createOAuthUser(String email, String username, AuthProvider authProvider){
+    public Users createOAuthUser(String email, String username, AuthProvider authProvider) {
 
         assertUsernameAvailable(username);
         assertEmailAvailable(email);
@@ -68,6 +77,55 @@ public class UserService {
         return usersRepository.save(user);
     }
 
+    @Transactional
+    public void linkAuthProvider(String actionToken) {
+
+        jwtService.assertActionTokenValid(actionToken, JwtPurpose.LINK_SOCIAL_ACCOUNT);
+
+        var claims = jwtService.extractClaims(actionToken);
+        var email = claims.getSubject();
+        var provider = AuthProvider.fromClient(claims.get("authProvider", String.class));
+
+        Users user = loadUserByEmail(email);
+
+        if (user.getAuthProviders().contains(provider)) {
+            throw new BusinessException(UserErrorCode.AUTH_PROVIDER_ALREADY_LINKED,
+                    "AuthProvider " + provider.name() + " already linked with the account");
+        }
+
+        user.getAuthProviders().add(provider);
+        usersRepository.save(user);
+    }
+
+    @Transactional
+    public void updatePassword(String email, String newPassword) {
+        var user = loadUserByEmail(email);
+
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BusinessException(UserErrorCode.SAME_PASSWORD);
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        usersRepository.save(user);
+    }
+
+    public void updatePassword(String email, ChangePasswordRequest request) {
+        jwtService.assertReAuthTokenValid(email, request.reauthenticateToken(), JwtPurpose.REAUTH);
+
+        updatePassword(email, request.newPassword());
+    }
+
+    public VerifyPasswordResponse verify(String email, String password) {
+        var user = loadUserByEmail(email);
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new BusinessException(UserErrorCode.INCORRECT_PASSWORD);
+        }
+
+        var token = jwtService.generateReAuthToken(email, JwtPurpose.REAUTH);
+        return new VerifyPasswordResponse(token, Instant.now());
+    }
+
     //helper
     public void assertEmailAvailable(String email) {
         if (usersRepository.existsByEmail(email)) {
@@ -81,9 +139,24 @@ public class UserService {
         }
     }
 
-    private Role loadDefaultRole(){
+    public void assertUserExistByEmail(String email) {
+        if (!usersRepository.existsByEmail(email))
+            throw new BusinessException(UserErrorCode.USER_NOT_FOUND, "No user exists with the email: " + email);
+    }
+
+    private Role loadDefaultRole() {
         return roleRepository.findByName(DEFAULT_ROLE).orElseThrow(
                 () -> new BusinessException(AuthErrorCode.ROLE_NOT_FOUND, "No role exists with name: " + DEFAULT_ROLE)
+        );
+    }
+
+    public boolean isUserNameAvailable(String username) {
+        return !usersRepository.existsByUsername(username);
+    }
+
+    public Users loadUserByEmail(String email) {
+        return usersRepository.findByEmail(email).orElseThrow(
+                () -> new BusinessException(UserErrorCode.USER_NOT_FOUND, "No user exists with the email: " + email)
         );
     }
 }

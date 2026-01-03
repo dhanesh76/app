@@ -6,6 +6,7 @@ import d76.app.auth.exception.AuthErrorCode;
 import d76.app.core.exception.ApiErrorResponse;
 import d76.app.security.jwt.JwtService;
 import d76.app.security.jwt.model.JwtPurpose;
+import d76.app.user.exception.UserErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -41,24 +42,24 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
                 meta = objectMapper.readValue(desc, new TypeReference<>() {
                 });
 
-            String provider = meta.get("provider");
+            String authProvider = meta.get("authProvider");
             String email = meta.get("email");
 
             switch (oaeError.getErrorCode()) {
                 case "email_missing" -> {
-                    var statuscode = HttpStatus.BAD_REQUEST.value();
+                    var statusValue = HttpStatus.BAD_REQUEST.value();
 
-                    res.setStatus(statuscode);
+                    res.setStatus(statusValue);
                     res.setContentType("application/json");
 
                     ApiErrorResponse response = ApiErrorResponse
                             .builder()
                             .errorCode(AuthErrorCode.EMAIL_REQUIRED.name())
-                            .statusCode(statuscode)
+                            .statusCode(statusValue)
                             .message(ex.getMessage())
                             .timestamp(Instant.now())
                             .path(request.getRequestURI())
-                            .authProvider(provider)
+                            .authProvider(authProvider)
                             .build();
 
                     res.getWriter().write(objectMapper.writeValueAsString(response));
@@ -67,20 +68,20 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 
                 case "user_not_registered" -> {
 
-                    var actionToken = jwtService.generateActionToken(email, JwtPurpose.SOCIAL_REGISTER, provider);
-                    var statuscode = HttpStatus.CONFLICT.value();
+                    var actionToken = jwtService.generateActionToken(email, JwtPurpose.SOCIAL_REGISTER, authProvider);
+                    var statusValue = HttpStatus.CONFLICT.value();
 
-                    res.setStatus(statuscode);
+                    res.setStatus(statusValue);
                     res.setContentType("application/json");
 
                     ApiErrorResponse response = ApiErrorResponse
                             .builder()
-                            .errorCode(AuthErrorCode.USER_NOT_REGISTERED.name())
-                            .statusCode(statuscode)
+                            .errorCode(UserErrorCode.USER_NOT_FOUND.name())
+                            .statusCode(statusValue)
                             .message(ex.getMessage())
                             .timestamp(Instant.now())
                             .path(request.getRequestURI())
-                            .authProvider(provider)
+                            .authProvider(authProvider)
                             .actionToken(actionToken)
                             .build();
                     res.getWriter().write(objectMapper.writeValueAsString(response));
@@ -88,20 +89,20 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
                 }
 
                 case "auth_provider_not_linked" -> {
-                    var actionToken = jwtService.generateActionToken(email, JwtPurpose.LINK_SOCIAL_ACCOUNT, provider);
-                    var statuscode = HttpStatus.CONFLICT.value();
+                    var actionToken = jwtService.generateActionToken(email, JwtPurpose.LINK_SOCIAL_ACCOUNT, authProvider);
+                    var statusValue = HttpStatus.CONFLICT.value();
 
-                    res.setStatus(statuscode);
+                    res.setStatus(statusValue);
                     res.setContentType("application/json");
 
                     ApiErrorResponse response = ApiErrorResponse
                             .builder()
                             .errorCode(AuthErrorCode.AUTH_PROVIDER_NOT_LINKED.name())
-                            .statusCode(statuscode)
+                            .statusCode(statusValue)
                             .message(meta.get("message"))
                             .timestamp(Instant.now())
                             .path(request.getRequestURI())
-                            .authProvider(provider)
+                            .authProvider(authProvider)
                             .actionToken(actionToken)
                             .build();
 
@@ -109,7 +110,7 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
                     return;
                 }
             }
-        };
+        }
 
         var errorCode = AuthErrorCode.INVALID_CREDENTIALS;
         ApiErrorResponse errorResponse = ApiErrorResponse.builder()
