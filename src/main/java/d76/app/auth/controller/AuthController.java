@@ -1,9 +1,6 @@
 package d76.app.auth.controller;
 
-import d76.app.auth.dto.ForgotPasswordRequest;
-import d76.app.auth.dto.RegisterRequest;
-import d76.app.auth.dto.RegisterResponse;
-import d76.app.auth.dto.ResetPasswordRequest;
+import d76.app.auth.dto.*;
 import d76.app.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,16 +18,26 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    ResponseEntity<RegisterResponse> register(@RequestBody @Valid RegisterRequest request) {
-
-        RegisterResponse response = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    void register(@RequestBody @Valid RegisterRequest request) {
+        authService.register(request);
     }
 
     @PostMapping("/password/forgot")
     @ResponseStatus(HttpStatus.OK)
     void forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
         authService.forgotPassword(request.email());
+    }
+
+    @PostMapping("/verify/otp")
+    ResponseEntity<RegisterResponse> verifyOtp(@RequestBody @Valid OtpVerifyRequest request){
+        var response = authService.verifyOtp(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/otp")
+    @ResponseStatus(code = HttpStatus.OK)
+    void requestOtp(@RequestBody @Valid OtpRequest otpRequest){
+        authService.requestOtp(otpRequest);
     }
 
     @PostMapping("/password/reset")

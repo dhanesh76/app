@@ -1,4 +1,4 @@
-package d76.app.core.notification.otp.model;
+package d76.app.notification.otp.model;
 
 public enum OtpPurpose {
     EMAIL_VERIFICATION {

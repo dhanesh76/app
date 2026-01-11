@@ -13,6 +13,7 @@ public enum AuthErrorCode implements ErrorCode {
     ROLE_NOT_FOUND(HttpStatus.NOT_FOUND, "The specified role does not exist."),
     USERNAME_TAKEN(HttpStatus.CONFLICT, "This username is already in use."),
     EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, "An account already exists with this email address."),
+    REGISTER_SESSION_EXPIRED(HttpStatus.REQUEST_TIMEOUT, "Register session expired, try again"),
 
     // oauth
     EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "A valid email address is required."),

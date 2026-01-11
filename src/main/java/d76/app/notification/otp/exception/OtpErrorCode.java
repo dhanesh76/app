@@ -1,4 +1,4 @@
-package d76.app.core.notification.otp.exception;
+package d76.app.notification.otp.exception;
 
 import d76.app.core.exception.ErrorCode;
 import org.springframework.http.HttpStatus;

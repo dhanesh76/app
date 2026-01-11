@@ -1,35 +1,34 @@
-package d76.app.core.notification.otp.service;
+package d76.app.notification.otp.service;
 
 import d76.app.core.exception.BusinessException;
-import d76.app.core.notification.otp.OtpStore;
-import d76.app.core.notification.otp.exception.OtpErrorCode;
-import d76.app.core.notification.otp.model.OtpData;
-import d76.app.core.notification.otp.model.OtpPurpose;
+import d76.app.core.service.CacheService;
+import d76.app.notification.otp.exception.OtpErrorCode;
+import d76.app.notification.otp.model.OtpData;
+import d76.app.notification.otp.model.OtpPurpose;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 public class OtpService {
 
-    private final OtpStore otpStore;
+    private final CacheService cacheService;
     private final SecureRandom secureRandom;
 
     private final int otpLength;
-
     private final long ttlSeconds;
 
     public OtpService(
-            OtpStore otpStore,
+            CacheService cacheService,
             @Value("${otp.length}") int otpLength,
             @Value("${otp.ttl}") long ttlSeconds
     ) {
-        this.otpStore = otpStore;
+        this.cacheService = cacheService;
         this.otpLength = otpLength;
         this.ttlSeconds = ttlSeconds;
         this.secureRandom = new SecureRandom();
@@ -46,30 +45,20 @@ public class OtpService {
         String key = userId + ":" + otpPurpose.name();
 
         String otp = generateOtp();
-        var otpData = new OtpData(otp, ttlSeconds, otpPurpose, Instant.now());
+        var otpData = new OtpData(otp, otpPurpose, Instant.now());
 
-        otpStore.save(key, otpData);
+        cacheService.put(key, otpData, ttlSeconds, TimeUnit.SECONDS);
         return otp;
     }
 
     public void verifyOtp(String userId, String otp, OtpPurpose otpPurpose) {
         String key = userId + ":" + otpPurpose.name();
 
-        OtpData otpData = otpStore.get(key).orElseThrow(
+        OtpData otpData = cacheService.get(key, OtpData.class).orElseThrow(
                 () -> new BusinessException(OtpErrorCode.OTP_EXPIRED)
         );
 
-        //check ttl
-        var issuedAt = otpData.issuedAt();
-        var age = Duration.between(issuedAt, Instant.now()).getSeconds();
-
-        if (age > otpData.ttl()) {
-            otpStore.delete(key);
-            throw new BusinessException(OtpErrorCode.OTP_EXPIRED);
-        }
-
         if (!otpPurpose.equals(otpData.purpose())) {
-
             log.warn("OTP validation failed user={} purpose={} expected={} reason=otp_mismatch",
                     userId, otpPurpose, otpData.purpose());
 
@@ -79,7 +68,6 @@ public class OtpService {
         if (!otp.equals(otpData.otp())) {
             throw new BusinessException(OtpErrorCode.INVALID_OTP);
         }
-
-        otpStore.delete(key);
+        cacheService.evict(key);
     }
 }
